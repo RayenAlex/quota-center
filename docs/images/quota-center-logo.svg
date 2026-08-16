@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" role="img" aria-labelledby="title desc">
+  <title id="title">Quota Center</title>
+  <desc id="desc">A central quota hub connecting four provider meters.</desc>
+  <defs>
+    <radialGradient id="background" cx="50%" cy="42%" r="78%">
+      <stop offset="0" stop-color="#18235a"/>
+      <stop offset="0.58" stop-color="#0c1239"/>
+      <stop offset="1" stop-color="#05071e"/>
+    </radialGradient>
+    <linearGradient id="frame" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4b6df5"/>
+      <stop offset="0.5" stop-color="#25d9c0"/>
+      <stop offset="1" stop-color="#b66bff"/>
+    </linearGradient>
+    <linearGradient id="core" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#31f4c1"/>
+      <stop offset="0.48" stop-color="#54b7ff"/>
+      <stop offset="1" stop-color="#bc72ff"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="160" height="160" rx="30" fill="url(#background)"/>
+  <rect x="17" y="17" width="126" height="126" rx="28" fill="#080d2d" fill-opacity=".44" stroke="#28376c" stroke-width="2"/>
+  <path d="M32 65h11M117 65h11M65 32v11M65 117v11" stroke="#293d78" stroke-width="2" stroke-linecap="round"/>
+
+  <g fill="none" stroke-linecap="round">
+    <path d="M52 52L66 66M108 52L94 66M52 108L66 94M108 108L94 94" stroke="#3b5ca3" stroke-width="2"/>
+    <path d="M52 52L66 66M108 52L94 66M52 108L66 94M108 108L94 94" stroke="#4ee8ce" stroke-width="1" stroke-dasharray="2 5" opacity=".8"/>
+  </g>
+
+  <!-- Four independent provider meters feed one shared quota center. -->
+  <g>
+    <rect x="25" y="25" width="35" height="22" rx="11" fill="#101a46" stroke="#405da5" stroke-width="1.5"/>
+    <circle cx="35" cy="36" r="4" fill="#38e6c1" filter="url(#glow)"/>
+    <path d="M43 32h11M43 36h8M43 40h5" stroke="#8fa7ff" stroke-width="2" stroke-linecap="round"/>
+
+    <rect x="100" y="25" width="35" height="22" rx="11" fill="#101a46" stroke="#405da5" stroke-width="1.5"/>
+    <circle cx="110" cy="36" r="4" fill="#be7aff" filter="url(#glow)"/>
+    <path d="M118 32h11M118 36h8M118 40h5" stroke="#8fa7ff" stroke-width="2" stroke-linecap="round"/>
+
+    <rect x="25" y="113" width="35" height="22" rx="11" fill="#101a46" stroke="#405da5" stroke-width="1.5"/>
+    <circle cx="35" cy="124" r="4" fill="#54b8ff" filter="url(#glow)"/>
+    <path d="M43 120h11M43 124h8M43 128h5" stroke="#8fa7ff" stroke-width="2" stroke-linecap="round"/>
+
+    <rect x="100" y="113" width="35" height="22" rx="11" fill="#101a46" stroke="#405da5" stroke-width="1.5"/>
+    <circle cx="110" cy="124" r="4" fill="#ffd166" filter="url(#glow)"/>
+    <path d="M118 120h11M118 124h8M118 128h5" stroke="#8fa7ff" stroke-width="2" stroke-linecap="round"/>
+  </g>
+
+  <g filter="url(#glow)">
+    <circle cx="80" cy="80" r="36" fill="#0b143a" stroke="#20356f" stroke-width="2"/>
+    <circle cx="80" cy="80" r="30" fill="none" stroke="url(#core)" stroke-width="5" stroke-linecap="round" stroke-dasharray="44 9 17 8 25 11" transform="rotate(-28 80 80)"/>
+    <circle cx="80" cy="80" r="23" fill="none" stroke="#315ed0" stroke-opacity=".65" stroke-width="2" stroke-dasharray="3 6"/>
+    <circle cx="80" cy="80" r="13" fill="#111b4b" stroke="#d9f8ff" stroke-width="3"/>
+    <path d="M86 86l8 8" stroke="#d9f8ff" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="80" cy="80" r="4" fill="#32f0bc"/>
+  </g>
+
+  <path d="M80 44v-6M116 80h6M80 116v6M44 80h-6" stroke="#6b85df" stroke-width="2" stroke-linecap="round"/>
+</svg>
