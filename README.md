@@ -113,6 +113,7 @@ plugins:
 
 Open **Plugin Management → 额度中心 → status** in the CPA management center.
 
+- When the page is opened from an authenticated CPA management session, the resource shell automatically loads the protected dashboard; an unauthenticated visit keeps the empty shell.
 - Use **Add connection** for Zhipu, MiniMax, Ark, and OpenCode Go.
 - Use **Sync CPA login accounts** for Codex, Gemini/Antigravity, and Grok.
 - Click **Refresh** on an account card to fetch the latest quota windows.
@@ -127,7 +128,7 @@ The panel never renders a secret value. When a provider has no stable quota endp
 | Manual credentials | Stored in `.quota-center-accounts` with private-directory permissions, `0600` file mode, and atomic replacement. |
 | CPA-native credentials | Read through `host.auth.list/get`; Codex, Gemini, and Grok entries are never written or deleted by this plugin. |
 | Panel and errors | Credentials are masked and known API keys, tokens, and AK/SK values are redacted from errors. |
-| Public resource | `/v0/resource/plugins/quota-center/status` is cache-free and unauthenticated; it does not read credentials or contact upstreams. |
+| Public resource | The initial `/v0/resource/plugins/quota-center/status` response is cache-free and contains no account data; inside an authenticated CPA management session, the browser reuses the existing management authorization to fetch the protected panel. |
 | Network requests | Redirects are rejected, provider endpoints are validated, and host callbacks are bounded by response-size and concurrency limits. |
 
 ## Management API

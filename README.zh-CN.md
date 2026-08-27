@@ -113,6 +113,7 @@ plugins:
 
 在 CPA 管理中心打开 **插件管理 → 额度中心 → status**。
 
+- 在已登录 CPA 管理中心的会话中打开页面时，resource 空壳会自动加载受保护的额度面板；未认证访问仍只显示空壳。
 - 使用 **添加连接** 添加智谱、MiniMax、方舟和 OpenCode Go。
 - 使用 **同步 CPA 登录账号** 同步 Codex、Gemini/Antigravity 和 Grok。
 - 点击账号卡片上的 **刷新** 获取最新额度窗口。
@@ -127,7 +128,7 @@ plugins:
 | 手动凭据 | 存放在 `.quota-center-accounts`，使用私有目录、`0600` 文件权限和原子替换。 |
 | CPA 原生凭据 | 仅通过 `host.auth.list/get` 读取；Codex、Gemini、Grok 不会被本插件写入或删除。 |
 | 面板与错误 | 凭据固定遮罩，错误信息会清理已知 API Key、Token 和 AK/SK。 |
-| 公开 resource | `/v0/resource/plugins/quota-center/status` 只返回无账号数据的空壳，不读取凭据、不访问上游。 |
+| 公开 resource | 初始 `/v0/resource/plugins/quota-center/status` 响应不缓存且不包含账号数据；在已认证 CPA 管理会话中，浏览器会复用现有管理授权加载受保护面板。 |
 | 网络请求 | 拒绝重定向，校验供应商 endpoint，并限制回调响应大小和并发数。 |
 
 ## 管理 API

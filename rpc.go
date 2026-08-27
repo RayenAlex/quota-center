@@ -200,7 +200,7 @@ func (d *Dispatcher) handleManagement(req pluginapi.ManagementRequest) pluginapi
 	if path == resourceStatusPath {
 		// Browser resources are intentionally unauthenticated by CPA; never touch credentials there.
 		// Do not render account metadata or quota snapshots without management authorization.
-		return htmlManagementResponse(RenderPanelView(nil, nowUTC(d.now), "overview"))
+		return htmlManagementResponse(RenderResourcePanel(nowUTC(d.now)))
 	}
 	d.mu.Lock()
 	config, client, service := d.config, d.client, d.service

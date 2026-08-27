@@ -96,8 +96,18 @@ func TestRPCResourcePathRendersPanel(t *testing.T) {
 	if err := decodeRPCResult(raw, &response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if response.StatusCode != 200 || !contains(string(response.Body), "额度中心") {
+	body := string(response.Body)
+	if response.StatusCode != 200 || !contains(body, "额度中心") {
 		t.Fatalf("response = %#v", response)
+	}
+	for _, want := range []string{
+		`data-management-bootstrap="true"`,
+		`const hasCPAAuth=stores.some(store=>`,
+		`if(hasCPAAuth)document.querySelector('[data-management-view="overview"]')?.click()`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("public resource missing automatic authenticated bootstrap %q", want)
+		}
 	}
 }
 

@@ -105,6 +105,16 @@ func TestRenderPanelUsesAuthenticatedNavigationForViews(t *testing.T) {
 	}
 }
 
+func TestRenderPanelDoesNotRebootstrapAuthenticatedResponse(t *testing.T) {
+	html := RenderPanel(nil, time.Unix(100, 0).UTC())
+	if !strings.Contains(html, `data-management-bootstrap="false"`) {
+		t.Fatal("authenticated panel must identify itself as non-bootstrap content")
+	}
+	if strings.Contains(html, `const hasCPAAuth=stores.some(store=>`) {
+		t.Fatal("authenticated panel must not trigger another management fetch")
+	}
+}
+
 func TestRenderPanelAddConnectionOmitsNativeProviders(t *testing.T) {
 	html := RenderPanel(nil, time.Unix(100, 0).UTC())
 	for _, leaked := range []string{
@@ -257,7 +267,7 @@ func TestRenderPanelHidesGenericCredentialForArk(t *testing.T) {
 	}
 }
 
-func TestRenderPanelRequiresExplicitManagementSync(t *testing.T) {
+func TestRenderPanelKeepsExplicitManagementSyncAction(t *testing.T) {
 	html := RenderPanel(nil, time.Unix(100, 0).UTC())
 	if !strings.Contains(html, `data-reload-accounts`) {
 		t.Fatal("panel must keep an explicit CPA account sync action")

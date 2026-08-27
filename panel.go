@@ -8,10 +8,11 @@ import (
 )
 
 type panelData struct {
-	GeneratedAt time.Time
-	Plans       []PlanResult
-	View        string
-	PluginID    string
+	GeneratedAt         time.Time
+	Plans               []PlanResult
+	View                string
+	PluginID            string
+	BootstrapManagement bool
 }
 
 var panelHelpers = template.FuncMap{
@@ -57,7 +58,7 @@ html.cpamp-plugin-host,html[data-cpamp-plugin-host],html.cpamp-plugin-host body,
 #quota-panel .status{color:#42d89e!important}
 #quota-panel .status.warn{color:#f1b46c!important}
 #quota-panel .status.danger{color:#f08383!important}
-</style></head><body id="quota-panel"><div class="app"><aside class="nav"><div class="logo">额度中心</div><nav class="nav-group"><a class="nav-item {{if eq .View "overview"}}active{{end}}" href="?view=overview" data-management-view="overview">总览<small>多平台额度</small></a><a class="nav-item {{if eq .View "accounts"}}active{{end}}" href="?view=accounts" data-management-view="accounts">账号配置<small>Token &amp; Tokens</small></a></nav></aside><main class="main">
+</style></head><body id="quota-panel" data-management-bootstrap="{{if .BootstrapManagement}}true{{else}}false{{end}}"><div class="app"><aside class="nav"><div class="logo">额度中心</div><nav class="nav-group"><a class="nav-item {{if eq .View "overview"}}active{{end}}" href="?view=overview" data-management-view="overview">总览<small>多平台额度</small></a><a class="nav-item {{if eq .View "accounts"}}active{{end}}" href="?view=accounts" data-management-view="accounts">账号配置<small>Token &amp; Tokens</small></a></nav></aside><main class="main">
 <div class="header"><div><h1>{{if eq .View "accounts"}}账号配置{{else}}额度总览{{end}}</h1><p>{{if eq .View "accounts"}}选择供应商并管理多个 Key / Token{{else}}多供应商额度、窗口与重置时间{{end}}</p></div><button class="action" type="button" data-open-add>+ 添加连接</button></div>
 <div class="meta"><span>{{len .Plans}} 个连接</span><span>最后更新 <time datetime="{{.GeneratedAt.UTC.Format "2006-01-02T15:04:05Z"}}" data-local-time data-local-seconds>{{.GeneratedAt.UTC.Format "2006-01-02 15:04:05"}}</time></span><span>桌面端四列</span></div>
 {{if .Plans}}<section class="grid">{{range .Plans}}<article class="card" data-account-id="{{.ID}}"><div class="card-head"><div><div class="card-title">{{accountBrand .}} · {{.Label}}</div><div class="card-sub">{{if .Plan}}{{.Plan}}{{else}}账号连接{{end}}{{if eq .Source "cpa"}} · CPA 认证{{end}}</div></div>{{if ne $.View "accounts"}}<button class="refresh" type="button" data-refresh="{{.ID}}" aria-label="刷新 {{.Label}}">↻ refresh</button>{{end}}</div>{{if eq $.View "accounts"}}<div class="status">已连接</div><div class="mask">{{if .CredentialMask}}{{.CredentialMask}}{{else}}••••••••{{end}}</div>{{if ne .Source "cpa"}}<div class="card-actions"><button class="refresh" type="button" data-edit="{{.ID}}" data-provider="{{.Provider}}" data-label="{{.Label}}" data-endpoint="{{.Endpoint}}">编辑</button><button class="refresh" type="button" data-delete="{{.ID}}">删除</button></div>{{end}}{{else if .Quota}}{{range windowGroups .Quota}}<div class="window-group">{{if .Label}}<div class="window-group-title">{{.Label}}</div>{{end}}{{range .Windows}}<div class="window"><div class="window-head"><span>{{.Name}}</span><span class="remaining">{{remainingText .}}</span></div><div class="bar"><div class="fill" style="width:{{printf "%.0f" .RemainingPercent}}%"></div></div>{{if .ResetAt}}<div class="reset"><time datetime="{{.ResetAt.UTC.Format "2006-01-02T15:04:05Z"}}" data-relative-reset>{{.ResetAt.UTC.Format "2006-01-02 15:04"}}</time></div>{{end}}</div>{{end}}</div>{{end}}{{if not (windows .Quota)}}<div class="status">已连接，暂无窗口数据</div>{{end}}{{else if .Error}}<div class="error">{{.Error}}</div>{{else}}<div class="status">等待刷新</div>{{end}}</article>{{end}}</section>{{else}}<div class="empty">暂无连接。点击“添加连接”开始配置智谱、MiniMax、方舟，或同步 CPA 已登录账号。</div>{{end}}
@@ -148,19 +149,32 @@ func maskCredential(value string) string {
 }
 
 func RenderPanel(results []PlanResult, generatedAt time.Time) string {
-	return RenderPanelView(results, generatedAt, "overview")
+	return renderPanelView(results, generatedAt, "overview", false)
 }
 
 func RenderPanelView(results []PlanResult, generatedAt time.Time, view string) string {
+	return renderPanelView(results, generatedAt, view, false)
+}
+
+func RenderResourcePanel(generatedAt time.Time) string {
+	return renderPanelView(nil, generatedAt, "overview", true)
+}
+
+func renderPanelView(results []PlanResult, generatedAt time.Time, view string, bootstrapManagement bool) string {
 	if view != "accounts" {
 		view = "overview"
 	}
 	var output strings.Builder
-	data := panelData{GeneratedAt: generatedAt, Plans: results, View: view, PluginID: pluginID}
+	data := panelData{GeneratedAt: generatedAt, Plans: results, View: view, PluginID: pluginID, BootstrapManagement: bootstrapManagement}
 	if err := panelTemplate.Execute(&output, data); err != nil {
 		return "<!doctype html><title>额度中心</title><p>quota panel unavailable: " + template.HTMLEscapeString(err.Error()) + "</p>"
 	}
-	return output.String()
+	html := output.String()
+	if bootstrapManagement {
+		const bootstrapScript = `<script>(()=>{const stores=[];try{stores.push(window.localStorage)}catch{}try{stores.push(window.sessionStorage)}catch{}try{if(window.parent&&window.parent!==window){try{stores.push(window.parent.localStorage)}catch{}try{stores.push(window.parent.sessionStorage)}catch{}}}catch{}const hasCPAAuth=stores.some(store=>{try{return String(store?.getItem('cli-proxy-auth')||'').trim()!==''}catch{return false}});if(hasCPAAuth)document.querySelector('[data-management-view="overview"]')?.click()})();</script>`
+		html = strings.Replace(html, `</script></body></html>`, bootstrapScript+`</body></html>`, 1)
+	}
+	return html
 }
 
 type statusPayload struct {
