@@ -67,7 +67,6 @@ func TestRenderPanelSupportsMiniMaxInternationalAndChinaRegions(t *testing.T) {
 		"MiniMax · 国际站（minimax.io）",
 		"MiniMax · 中国站（minimaxi.com）",
 		"endpoint:plan.selectedOptions[0]?.dataset.endpoint||''",
-		`data-endpoint="{{.Endpoint}}"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("panel missing MiniMax region contract %q", want)

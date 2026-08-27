@@ -173,6 +173,36 @@ func TestAddMiniMaxAccountRejectsUntrustedEndpoint(t *testing.T) {
 	}
 }
 
+func TestStoredMiniMaxEndpointRoundTripAndLegacyDefault(t *testing.T) {
+	tests := []struct {
+		name         string
+		json         string
+		wantEndpoint string
+	}{
+		{
+			name:         "explicit endpoint",
+			json:         `{"id":"mm-global","provider":"minimax","plan":"coding-plan","label":"global","api_key":"secret-key","endpoint":"` + miniMaxGlobalEndpoint + `"}`,
+			wantEndpoint: miniMaxGlobalEndpoint,
+		},
+		{
+			name:         "legacy without endpoint",
+			json:         `{"id":"mm-legacy","provider":"minimax","plan":"coding-plan","label":"legacy","api_key":"secret-key"}`,
+			wantEndpoint: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plan, err := accountFromStoredCredential(StoredCredential{Provider: ProviderMiniMax, JSON: json.RawMessage(tt.json)})
+			if err != nil {
+				t.Fatalf("accountFromStoredCredential() error = %v", err)
+			}
+			if plan.Provider != ProviderMiniMax || plan.Endpoint != tt.wantEndpoint {
+				t.Fatalf("plan = %#v, want endpoint %q", plan, tt.wantEndpoint)
+			}
+		})
+	}
+}
+
 func TestAddAccountRejectsCPANativeProviders(t *testing.T) {
 	for _, provider := range []Provider{ProviderCodex, ProviderGemini, ProviderGrok} {
 		store := &fakeSavingAuthStore{}

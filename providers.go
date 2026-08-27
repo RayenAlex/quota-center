@@ -204,7 +204,7 @@ func miniMaxRemainingPercent(percentage, usage, total *float64, region miniMaxRe
 }
 
 func miniMaxWeeklyAvailable(item *miniMaxQuotaModel) bool {
-	if item.WeeklyStatus != nil && *item.WeeklyStatus != 0 && *item.WeeklyStatus != 1 {
+	if item.WeeklyStatus != nil && *item.WeeklyStatus != 1 {
 		return false
 	}
 	return item.WeeklyRemainingPercent != nil || (item.WeeklyUsageCount != nil && item.WeeklyTotalCount != nil && *item.WeeklyTotalCount > 0)
@@ -223,12 +223,12 @@ func miniMaxResetTime(absolute, offsetMillis int64, now time.Time) *time.Time {
 
 func selectMiniMaxModel(items []miniMaxQuotaModel, region miniMaxRegion) *miniMaxQuotaModel {
 	var selected *miniMaxQuotaModel
+	var wildcard *miniMaxQuotaModel
 	best := 101.0
-	preferred := false
 	for i := range items {
 		item := &items[i]
-		name := strings.TrimSpace(item.ModelName)
-		allowed := strings.HasPrefix(name, "MiniMax-M")
+		name := strings.ToLower(strings.TrimSpace(item.ModelName))
+		allowed := strings.HasPrefix(name, "minimax-m")
 		if region == miniMaxRegionInternational {
 			allowed = allowed || name == "general" || name == "video"
 		}
@@ -239,13 +239,19 @@ func selectMiniMaxModel(items []miniMaxQuotaModel, region miniMaxRegion) *miniMa
 		if !reportable {
 			continue
 		}
-		isPreferred := strings.HasPrefix(name, "MiniMax-M")
-		if selected == nil || (isPreferred && !preferred) || (isPreferred == preferred && remaining < best) {
+		if name == "minimax-m*" {
+			copy := *item
+			wildcard = &copy
+			continue
+		}
+		if selected == nil || remaining < best {
 			copy := *item
 			selected = &copy
 			best = remaining
-			preferred = isPreferred
 		}
+	}
+	if wildcard != nil {
+		return wildcard
 	}
 	return selected
 }

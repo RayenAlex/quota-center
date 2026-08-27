@@ -27,7 +27,7 @@ var panelHelpers = template.FuncMap{
 
 var panelTemplate = template.Must(template.New("panel").Funcs(panelHelpers).Parse(`<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>额度中心</title><meta name="qc-endpoint-template" content='data-endpoint="{{"{{"}}.Endpoint{{"}}"}}"'><style>
+<title>额度中心</title><style>
 #quota-panel{color-scheme:dark;--qc-host-header-safe-area:96px;--qc-bg:#00120f;--qc-panel:#06251f;--qc-panel-2:#0a3029;--qc-control:#041b17;--qc-line:#1d6c5a;--qc-text:#d8f5e7;--qc-muted:#84bca9;--qc-accent:#42d89e;--qc-accent-strong:#155646;--qc-warn:#f1b46c;--qc-danger:#f08383}
 *{box-sizing:border-box}body{margin:0;background:var(--qc-bg);color:var(--qc-text);font:14px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:inherit;text-decoration:none}
 .app{display:grid;grid-template-columns:164px minmax(0,1fr);min-height:100vh}.nav{padding:20px 12px;background:#0b2420;border-right:1px solid var(--qc-line)}.logo{padding:0 8px 22px;font-weight:850;letter-spacing:-.04em}.nav-group{display:grid;gap:6px}.nav-item{display:block;padding:11px;border-radius:9px;color:var(--qc-muted);font-size:11px;font-weight:750}.nav-item.active{background:#17483e;color:var(--qc-text)}.nav-item small{display:block;margin-top:3px;font-size:9px;font-weight:500;opacity:.58}

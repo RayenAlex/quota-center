@@ -147,6 +147,51 @@ func TestParseMiniMaxRejectsNonzeroBaseResponse(t *testing.T) {
 	}
 }
 
+func TestParseMiniMaxPrefersExactWildcardModel(t *testing.T) {
+	result, err := parseMiniMaxQuotaResponse([]byte(`{
+		"model_remains":[
+			{"model_name":"general","current_interval_remaining_percent":5},
+			{"model_name":"MiniMax-M2.7","current_interval_remaining_percent":90},
+			{"model_name":"MINIMAX-M*","current_interval_remaining_percent":10}
+		],"base_resp":{"status_code":0}
+	}`), miniMaxRegionInternational, time.Unix(100, 0).UTC())
+	if err != nil {
+		t.Fatalf("parseMiniMaxQuotaResponse() error = %v", err)
+	}
+	if result.FiveHour.RemainingPercent != 10 {
+		t.Fatalf("five-hour = %#v, want exact wildcard row", result.FiveHour)
+	}
+}
+
+func TestParseMiniMaxWithoutWildcardChoosesLowestAllowedRemaining(t *testing.T) {
+	result, err := parseMiniMaxQuotaResponse([]byte(`{
+		"model_remains":[
+			{"model_name":"MiniMax-M2.7","current_interval_remaining_percent":90},
+			{"model_name":"VIDEO","current_interval_remaining_percent":20},
+			{"model_name":"General","current_interval_remaining_percent":5}
+		],"base_resp":{"status_code":0}
+	}`), miniMaxRegionInternational, time.Unix(100, 0).UTC())
+	if err != nil {
+		t.Fatalf("parseMiniMaxQuotaResponse() error = %v", err)
+	}
+	if result.FiveHour.RemainingPercent != 5 {
+		t.Fatalf("five-hour = %#v, want lowest allowed row", result.FiveHour)
+	}
+}
+
+func TestParseMiniMaxWeeklyStatusZeroDisablesWeeklyWindow(t *testing.T) {
+	result, err := parseMiniMaxQuotaResponse([]byte(`{
+		"model_remains":[{"model_name":"general","current_interval_remaining_percent":80,"current_weekly_remaining_percent":60,"current_weekly_status":0}],
+		"base_resp":{"status_code":0}
+	}`), miniMaxRegionInternational, time.Unix(100, 0).UTC())
+	if err != nil {
+		t.Fatalf("parseMiniMaxQuotaResponse() error = %v", err)
+	}
+	if result.Weekly.Name != "" || len(result.Windows) != 1 {
+		t.Fatalf("result = %#v, want five-hour only", result)
+	}
+}
+
 func TestParseArkQuotaResponsesExposeAgentAndCodingWindows(t *testing.T) {
 	agent, err := ParseArkAgentQuotaResponse([]byte(`{"Result":{"PlanType":"pro","AFPFiveHour":{"Quota":100,"Used":25,"ResetTime":1780329600},"AFPWeekly":{"Quota":500,"Used":50,"ResetTime":1780848000},"AFPMonthly":{"Quota":1000,"Used":100,"ResetTime":1783008000}}}`))
 	if err != nil {
