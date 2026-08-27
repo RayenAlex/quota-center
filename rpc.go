@@ -233,6 +233,7 @@ type addAccountRequest struct {
 	AccessKeyID     string `json:"access_key_id"`
 	Secret          string `json:"secret"`
 	SecretAccessKey string `json:"secret_access_key"`
+	Endpoint        string `json:"endpoint"`
 }
 
 func (d *Dispatcher) handleAddAccount(req pluginapi.ManagementRequest) pluginapi.ManagementResponse {
@@ -249,6 +250,12 @@ func (d *Dispatcher) handleAddAccount(req pluginapi.ManagementRequest) pluginapi
 	}
 	if !isPluginManagedProvider(provider) {
 		return jsonManagementResponse(http.StatusBadRequest, map[string]string{"error": "CPA 原生账号请用同步登录，不要写入认证文件"})
+	}
+	endpoint := strings.TrimSpace(input.Endpoint)
+	if endpoint != "" {
+		if err := validateProviderEndpoint(provider, endpoint); err != nil {
+			return jsonManagementResponse(http.StatusBadRequest, map[string]string{"error": "endpoint is invalid"})
+		}
 	}
 	label := strings.TrimSpace(input.Label)
 	if label == "" {
@@ -273,7 +280,7 @@ func (d *Dispatcher) handleAddAccount(req pluginapi.ManagementRequest) pluginapi
 	if !planIDPattern.MatchString(accountID) {
 		return jsonManagementResponse(http.StatusBadRequest, map[string]string{"error": "label is too long"})
 	}
-	plan := PlanConfig{ID: accountID, Label: label, Provider: provider, Plan: strings.TrimSpace(input.Plan), AccessKey: firstNonEmpty(input.AccessID, input.AccessKeyID), SecretKey: firstNonEmpty(input.Secret, input.SecretAccessKey)}
+	plan := PlanConfig{ID: accountID, Label: label, Provider: provider, Plan: strings.TrimSpace(input.Plan), Endpoint: endpoint, AccessKey: firstNonEmpty(input.AccessID, input.AccessKeyID), SecretKey: firstNonEmpty(input.Secret, input.SecretAccessKey)}
 	plan = normalizePlan(plan)
 	credentialValue := strings.TrimSpace(input.Credential)
 	switch provider {
@@ -306,7 +313,7 @@ func (d *Dispatcher) handleAddAccount(req pluginapi.ManagementRequest) pluginapi
 	}
 	ctx, cancel := contextWithTimeout(context.Background(), config.Timeout)
 	defer cancel()
-	remembered := PlanResult{ID: plan.ID, Provider: provider, Plan: plan.Plan, Label: plan.Label, CredentialMask: maskCredential(firstNonEmpty(plan.APIKey, plan.AccessKey))}
+	remembered := PlanResult{ID: plan.ID, Provider: provider, Plan: plan.Plan, Label: plan.Label, Endpoint: plan.Endpoint, CredentialMask: maskCredential(firstNonEmpty(plan.APIKey, plan.AccessKey))}
 	if provider != ProviderOpenCode {
 		remembered = requestService.RefreshOne(ctx, plan)
 		if remembered.Error != "" {
@@ -319,6 +326,9 @@ func (d *Dispatcher) handleAddAccount(req pluginapi.ManagementRequest) pluginapi
 		"type":     string(provider),
 		"plan":     plan.Plan,
 		"label":    plan.Label,
+	}
+	if plan.Endpoint != "" {
+		credential["endpoint"] = plan.Endpoint
 	}
 	if provider == ProviderArk {
 		credential["access_key_id"] = plan.AccessKey
@@ -481,7 +491,7 @@ func refreshResults(d *Dispatcher, service *Service, ctx context.Context, plans 
 	}
 	cacheMatches := len(d.lastPlanIDs) == len(planIDs)
 	for index := range planIDs {
-		if cacheMatches && d.lastPlanIDs[index] != planIDs[index] {
+		if cacheMatches && (d.lastPlanIDs[index] != planIDs[index] || (index < len(d.lastResults) && d.lastResults[index].Endpoint != plans[index].Endpoint)) {
 			cacheMatches = false
 		}
 	}

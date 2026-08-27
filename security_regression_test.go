@@ -114,6 +114,65 @@ func TestAddAccountStoresCredentialUnderProviderSemanticField(t *testing.T) {
 	}
 }
 
+func TestAddMiniMaxAccountPersistsValidatedEndpoint(t *testing.T) {
+	var seenHost, seenPath, seenAuth string
+	store := &fakeSavingAuthStore{}
+	dispatcher := NewDispatcher(NewClient(QuotaHTTPClientFunc(func(_ context.Context, req *http.Request) (*http.Response, error) {
+		seenHost, seenPath, seenAuth = req.URL.Host, req.URL.Path, req.Header.Get("Authorization")
+		return jsonResponse(http.StatusOK, `{"model_remains":[{"model_name":"general","current_interval_remaining_percent":80}],"base_resp":{"status_code":0}}`), nil
+	})))
+	dispatcher.auth = store
+	dispatcher.accounts = store
+	response := dispatcher.handleManagement(pluginManagementRequest(http.MethodPost, managementAccountsPath, []byte(
+		`{"provider":"minimax","plan":"coding-plan","label":"MiniMax 国际站","credential":"secret-key","endpoint":"`+miniMaxGlobalEndpoint+`"}`,
+	)))
+	if response.StatusCode != http.StatusCreated {
+		t.Fatalf("status = %d, body = %s", response.StatusCode, response.Body)
+	}
+	if seenHost != "api.minimax.io" || seenPath != "/v1/api/openplatform/coding_plan/remains" || seenAuth != "Bearer secret-key" {
+		t.Fatalf("verification request = %s %s %q", seenHost, seenPath, seenAuth)
+	}
+	var saved struct {
+		Provider string `json:"provider"`
+		Plan     string `json:"plan"`
+		APIKey   string `json:"api_key"`
+		Endpoint string `json:"endpoint"`
+	}
+	if err := json.Unmarshal(store.saved, &saved); err != nil {
+		t.Fatalf("decode saved credential: %v", err)
+	}
+	if saved.Provider != string(ProviderMiniMax) || saved.Plan != "coding-plan" || saved.APIKey != "secret-key" || saved.Endpoint != miniMaxGlobalEndpoint {
+		t.Fatalf("saved credential = %#v", saved)
+	}
+	if strings.Contains(string(response.Body), "secret-key") {
+		t.Fatal("management response leaked credential")
+	}
+}
+
+func TestAddMiniMaxAccountRejectsUntrustedEndpoint(t *testing.T) {
+	var requests int
+	store := &fakeSavingAuthStore{}
+	dispatcher := NewDispatcher(NewClient(QuotaHTTPClientFunc(func(context.Context, *http.Request) (*http.Response, error) {
+		requests++
+		t.Fatal("untrusted endpoint must not call upstream")
+		return nil, nil
+	})))
+	dispatcher.auth = store
+	dispatcher.accounts = store
+	response := dispatcher.handleManagement(pluginManagementRequest(http.MethodPost, managementAccountsPath, []byte(
+		`{"provider":"minimax","plan":"coding-plan","label":"work","credential":"secret-key","endpoint":"https://attacker.test/steal"}`,
+	)))
+	if response.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status = %d, body = %s", response.StatusCode, response.Body)
+	}
+	if requests != 0 || store.saved != nil {
+		t.Fatalf("untrusted endpoint side effects: requests=%d saved=%v", requests, store.saved != nil)
+	}
+	if strings.Contains(string(response.Body), "secret-key") {
+		t.Fatal("endpoint validation response leaked credential")
+	}
+}
+
 func TestAddAccountRejectsCPANativeProviders(t *testing.T) {
 	for _, provider := range []Provider{ProviderCodex, ProviderGemini, ProviderGrok} {
 		store := &fakeSavingAuthStore{}

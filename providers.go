@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"net/url"
 	"sort"
@@ -17,7 +18,7 @@ import (
 )
 
 const (
-	miniMaxCNEndpoint           = "https://api.minimaxi.com/v1/api/openplatform/coding_plan/remains"
+	miniMaxCNEndpoint           = "https://api.minimaxi.com/v1/token_plan/remains"
 	miniMaxGlobalEndpoint       = "https://api.minimax.io/v1/api/openplatform/coding_plan/remains"
 	codexUsageEndpoint          = "https://chatgpt.com/backend-api/wham/usage"
 	geminiCodeAssist            = "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist"
@@ -30,6 +31,13 @@ const (
 	arkService                  = "ark"
 	arkContentType              = "application/json; charset=utf-8"
 	arkSignedHeaders            = "host;x-date;x-content-sha256;content-type"
+)
+
+type miniMaxRegion string
+
+const (
+	miniMaxRegionInternational miniMaxRegion = "international"
+	miniMaxRegionChina         miniMaxRegion = "china"
 )
 
 func providerLabel(provider Provider) string {
@@ -79,9 +87,6 @@ func (c *Client) doRequest(ctx context.Context, method, endpoint string, headers
 
 func (c *Client) fetchMiniMax(ctx context.Context, plan PlanConfig) (*QuotaResult, error) {
 	endpoint := miniMaxCNEndpoint
-	if strings.Contains(strings.ToLower(plan.Endpoint), "minimax.io") {
-		endpoint = miniMaxGlobalEndpoint
-	}
 	if plan.Endpoint != "" {
 		endpoint = plan.Endpoint
 	}
@@ -96,23 +101,31 @@ func (c *Client) fetchMiniMax(ctx context.Context, plan PlanConfig) (*QuotaResul
 	if status < 200 || status >= 300 {
 		return nil, fmt.Errorf("MiniMax API %d: %s", status, sanitizeMessage(string(raw)))
 	}
-	result, err := ParseMiniMaxQuotaResponse(raw)
+	result, err := parseMiniMaxQuotaResponse(raw, miniMaxRegionForEndpoint(endpoint), time.Now().UTC())
 	if err != nil {
 		return nil, fmt.Errorf("decode MiniMax quota response: %w", err)
 	}
 	return result, nil
 }
 
+type miniMaxQuotaModel struct {
+	ModelName                string   `json:"model_name"`
+	IntervalRemainingPercent *float64 `json:"current_interval_remaining_percent"`
+	WeeklyRemainingPercent   *float64 `json:"current_weekly_remaining_percent"`
+	WeeklyStatus             *int     `json:"current_weekly_status"`
+	IntervalUsageCount       *float64 `json:"current_interval_usage_count"`
+	IntervalTotalCount       *float64 `json:"current_interval_total_count"`
+	WeeklyUsageCount         *float64 `json:"current_weekly_usage_count"`
+	WeeklyTotalCount         *float64 `json:"current_weekly_total_count"`
+	EndTime                  int64    `json:"end_time"`
+	WeeklyEndTime            int64    `json:"weekly_end_time"`
+	RemainsTime              int64    `json:"remains_time"`
+	WeeklyRemainsTime        int64    `json:"weekly_remains_time"`
+}
+
 type miniMaxQuotaResponse struct {
-	ModelRemains []struct {
-		ModelName                string  `json:"model_name"`
-		IntervalRemainingPercent float64 `json:"current_interval_remaining_percent"`
-		WeeklyRemainingPercent   float64 `json:"current_weekly_remaining_percent"`
-		WeeklyStatus             int     `json:"current_weekly_status"`
-		EndTime                  int64   `json:"end_time"`
-		WeeklyEndTime            int64   `json:"weekly_end_time"`
-	} `json:"model_remains"`
-	BaseResp *struct {
+	ModelRemains []miniMaxQuotaModel `json:"model_remains"`
+	BaseResp     *struct {
 		StatusCode int    `json:"status_code"`
 		StatusMsg  string `json:"status_msg"`
 	} `json:"base_resp,omitempty"`
@@ -126,33 +139,115 @@ func ParseMiniMaxQuotaResponse(body []byte) (*QuotaResult, error) {
 	if payload.BaseResp != nil && payload.BaseResp.StatusCode != 0 {
 		return nil, fmt.Errorf("API error (code %d): %s", payload.BaseResp.StatusCode, payload.BaseResp.StatusMsg)
 	}
-	var item *struct {
-		ModelName                string  `json:"model_name"`
-		IntervalRemainingPercent float64 `json:"current_interval_remaining_percent"`
-		WeeklyRemainingPercent   float64 `json:"current_weekly_remaining_percent"`
-		WeeklyStatus             int     `json:"current_weekly_status"`
-		EndTime                  int64   `json:"end_time"`
-		WeeklyEndTime            int64   `json:"weekly_end_time"`
-	}
 	for i := range payload.ModelRemains {
 		if payload.ModelRemains[i].ModelName == "general" {
-			item = &payload.ModelRemains[i]
-			break
+			return parseMiniMaxQuotaModel(&payload.ModelRemains[i], miniMaxRegionInternational, time.Now().UTC()), nil
 		}
 	}
+	return &QuotaResult{Level: "Coding Plan"}, nil
+}
+
+func miniMaxRegionForEndpoint(endpoint string) miniMaxRegion {
+	parsed, err := url.Parse(strings.TrimSpace(endpoint))
+	if err == nil && strings.EqualFold(parsed.Hostname(), "api.minimax.io") {
+		return miniMaxRegionInternational
+	}
+	return miniMaxRegionChina
+}
+
+func parseMiniMaxQuotaResponse(body []byte, region miniMaxRegion, now time.Time) (*QuotaResult, error) {
+	var payload miniMaxQuotaResponse
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, err
+	}
+	if payload.BaseResp != nil && payload.BaseResp.StatusCode != 0 {
+		return nil, fmt.Errorf("API error (code %d): %s", payload.BaseResp.StatusCode, payload.BaseResp.StatusMsg)
+	}
+	item := selectMiniMaxModel(payload.ModelRemains, region)
+	return parseMiniMaxQuotaModel(item, region, now), nil
+}
+
+func parseMiniMaxQuotaModel(item *miniMaxQuotaModel, region miniMaxRegion, now time.Time) *QuotaResult {
 	result := &QuotaResult{Level: "Coding Plan"}
 	if item == nil {
-		return result, nil
+		return result
 	}
-	window := QuotaWindow{Name: "five_hour", RemainingPercent: clamp(item.IntervalRemainingPercent), UsedPercent: clamp(100 - item.IntervalRemainingPercent), ResetAt: epochMillis(item.EndTime)}
-	result.FiveHour = window
-	result.Windows = append(result.Windows, window)
-	if item.WeeklyStatus == 1 {
-		weekly := QuotaWindow{Name: "weekly", RemainingPercent: clamp(item.WeeklyRemainingPercent), UsedPercent: clamp(100 - item.WeeklyRemainingPercent), ResetAt: epochMillis(item.WeeklyEndTime)}
-		result.Weekly = weekly
-		result.Windows = append(result.Windows, weekly)
+	if remaining, ok := miniMaxRemainingPercent(item.IntervalRemainingPercent, item.IntervalUsageCount, item.IntervalTotalCount, region); ok {
+		window := QuotaWindow{Name: "five_hour", RemainingPercent: remaining, UsedPercent: clamp(100 - remaining), ResetAt: miniMaxResetTime(item.EndTime, item.RemainsTime, now)}
+		result.FiveHour = window
+		result.Windows = append(result.Windows, window)
 	}
-	return result, nil
+	if miniMaxWeeklyAvailable(item) {
+		if remaining, ok := miniMaxRemainingPercent(item.WeeklyRemainingPercent, item.WeeklyUsageCount, item.WeeklyTotalCount, region); !ok {
+			return result
+		} else {
+			weekly := QuotaWindow{Name: "weekly", RemainingPercent: remaining, UsedPercent: clamp(100 - remaining), ResetAt: miniMaxResetTime(item.WeeklyEndTime, item.WeeklyRemainsTime, now)}
+			result.Weekly = weekly
+			result.Windows = append(result.Windows, weekly)
+		}
+	}
+	return result
+}
+
+func miniMaxRemainingPercent(percentage, usage, total *float64, region miniMaxRegion) (float64, bool) {
+	if total != nil && usage != nil && *total > 0 && *usage >= 0 {
+		remaining := *usage / *total * 100
+		if region == miniMaxRegionChina {
+			remaining = 100 - remaining
+		}
+		return math.Round(clamp(remaining)*100) / 100, true
+	}
+	if region == miniMaxRegionInternational && percentage != nil {
+		return math.Round(clamp(*percentage)*100) / 100, true
+	}
+	return 0, false
+}
+
+func miniMaxWeeklyAvailable(item *miniMaxQuotaModel) bool {
+	if item.WeeklyStatus != nil && *item.WeeklyStatus != 0 && *item.WeeklyStatus != 1 {
+		return false
+	}
+	return item.WeeklyRemainingPercent != nil || (item.WeeklyUsageCount != nil && item.WeeklyTotalCount != nil && *item.WeeklyTotalCount > 0)
+}
+
+func miniMaxResetTime(absolute, offsetMillis int64, now time.Time) *time.Time {
+	if offsetMillis > 0 {
+		at := now.Add(time.Duration(offsetMillis) * time.Millisecond).UTC()
+		return &at
+	}
+	if absolute > 0 {
+		return epochMillis(absolute)
+	}
+	return nil
+}
+
+func selectMiniMaxModel(items []miniMaxQuotaModel, region miniMaxRegion) *miniMaxQuotaModel {
+	var selected *miniMaxQuotaModel
+	best := 101.0
+	preferred := false
+	for i := range items {
+		item := &items[i]
+		name := strings.TrimSpace(item.ModelName)
+		allowed := strings.HasPrefix(name, "MiniMax-M")
+		if region == miniMaxRegionInternational {
+			allowed = allowed || name == "general" || name == "video"
+		}
+		if !allowed {
+			continue
+		}
+		remaining, reportable := miniMaxRemainingPercent(item.IntervalRemainingPercent, item.IntervalUsageCount, item.IntervalTotalCount, region)
+		if !reportable {
+			continue
+		}
+		isPreferred := strings.HasPrefix(name, "MiniMax-M")
+		if selected == nil || (isPreferred && !preferred) || (isPreferred == preferred && remaining < best) {
+			copy := *item
+			selected = &copy
+			best = remaining
+			preferred = isPreferred
+		}
+	}
+	return selected
 }
 
 func (c *Client) fetchCodex(ctx context.Context, plan PlanConfig) (*QuotaResult, error) {

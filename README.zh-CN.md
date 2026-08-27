@@ -37,7 +37,7 @@
 | 供应商 | 认证来源 | 说明 |
 | --- | --- | --- |
 | 智谱 | 配置文件或管理面板中的 API Key | 使用官方额度接口。 |
-| MiniMax Coding Plan | 配置文件或管理面板中的 API Key | 支持官方 MiniMax Coding Plan 接口。 |
+| MiniMax Coding Plan | 配置文件或管理面板中的 API Key | 可选择国际站（`minimax.io`，`https://api.minimax.io/v1/api/openplatform/coding_plan/remains`）或中国站（`minimaxi.com`，`https://api.minimaxi.com/v1/token_plan/remains`）。 |
 | 方舟 | AccessKey ID + Secret AccessKey | 使用签名请求查询 Agent / Coding Plan 额度。 |
 | OpenCode Go | 配置文件或管理面板中的 API Key | 可以保存连接；不假设存在稳定的公开额度接口。 |
 | Codex | CPA 原生认证 | 从 CPA 认证文件同步，不要重复添加手动凭据。 |
@@ -85,11 +85,19 @@ plugins:
     quota-center:
       timeout: 15s
       accounts:
-        - id: minimax-main
+        - id: minimax-international
           provider: minimax
           plan: coding-plan
-          label: MiniMax Coding
+          label: MiniMax 国际站
           api_key_env: MINIMAX_CODING_KEY
+          endpoint: https://api.minimax.io/v1/api/openplatform/coding_plan/remains
+
+        - id: minimax-china
+          provider: minimax
+          plan: coding-plan
+          label: MiniMax 中国站
+          api_key_env: MINIMAX_CHINA_CODING_KEY
+          endpoint: https://api.minimaxi.com/v1/token_plan/remains
 
         - id: ark-agent
           provider: ark
@@ -99,7 +107,7 @@ plugins:
           secret_key_env: VOLC_SECRET_KEY
 ```
 
-推荐使用 `accounts`。旧版 `plans` 数组仍然兼容，并会按智谱账号解析。endpoint 覆盖必须使用 HTTPS 且匹配允许的官方主机；不支持的自定义主机会在配置阶段被拒绝。
+推荐使用 `accounts`。旧版 `plans` 数组仍然兼容，并会按智谱账号解析。MiniMax 账号省略 `endpoint` 时保持旧行为，默认走中国站（`minimaxi.com`）；如需国际站或明确指定中国站，请在配置中填写对应 endpoint。endpoint 覆盖必须使用 HTTPS 且匹配允许的官方主机；不支持的自定义主机会在配置阶段被拒绝。
 
 ## 使用管理面板
 

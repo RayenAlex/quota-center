@@ -21,6 +21,7 @@ type PlanResult struct {
 	Source         AuthSource   `json:"source,omitempty"`
 	AuthType       string       `json:"auth_type,omitempty"`
 	CredentialMask string       `json:"credential_mask,omitempty"`
+	Endpoint       string       `json:"-"`
 	Quota          *QuotaResult `json:"quota,omitempty"`
 	Error          string       `json:"error,omitempty"`
 	FetchedAt      time.Time    `json:"fetched_at"`
@@ -42,6 +43,7 @@ func (s *Service) refresh(ctx context.Context, plan PlanConfig) PlanResult {
 		Label:          plan.Label,
 		Source:         plan.Source,
 		AuthType:       plan.AuthType,
+		Endpoint:       plan.Endpoint,
 		CredentialMask: maskCredential(firstNonEmpty(plan.APIKey, plan.AccessToken, plan.AccessKey)),
 	}
 	if s.now != nil {

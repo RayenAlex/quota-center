@@ -56,6 +56,42 @@ func TestRenderPanelProviderControlsExposeNativeSelection(t *testing.T) {
 	}
 }
 
+func TestRenderPanelSupportsMiniMaxInternationalAndChinaRegions(t *testing.T) {
+	html := RenderPanel([]PlanResult{{
+		ID: "mm-global", Provider: ProviderMiniMax, Plan: "coding-plan",
+		Label: "MiniMax 国际站", Endpoint: miniMaxGlobalEndpoint,
+	}}, time.Unix(100, 0).UTC())
+	for _, want := range []string{
+		miniMaxGlobalEndpoint,
+		miniMaxCNEndpoint,
+		"MiniMax · 国际站（minimax.io）",
+		"MiniMax · 中国站（minimaxi.com）",
+		"endpoint:plan.selectedOptions[0]?.dataset.endpoint||''",
+		`data-endpoint="{{.Endpoint}}"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("panel missing MiniMax region contract %q", want)
+		}
+	}
+}
+
+func TestRenderPanelRestoresMiniMaxEndpointInEditMode(t *testing.T) {
+	html := RenderPanelView([]PlanResult{{
+		ID: "mm-global", Provider: ProviderMiniMax, Plan: "coding-plan",
+		Label: "MiniMax 国际站", Endpoint: miniMaxGlobalEndpoint,
+	}}, time.Unix(100, 0).UTC(), "accounts")
+	for _, want := range []string{
+		`data-edit="mm-global"`,
+		`data-endpoint="https://api.minimax.io/v1/api/openplatform/coding_plan/remains"`,
+		`endpoint:button.getAttribute('data-endpoint')||''`,
+		`updateProvider((preset&&preset.provider)||form.elements.provider.value||'zhipu',preset&&preset.endpoint||'')`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("panel missing MiniMax edit restoration contract %q", want)
+		}
+	}
+}
+
 func TestRenderPanelAddConnectionOmitsNativeProviders(t *testing.T) {
 	html := RenderPanel(nil, time.Unix(100, 0).UTC())
 	for _, leaked := range []string{

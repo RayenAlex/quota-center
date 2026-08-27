@@ -68,6 +68,85 @@ func TestParseMiniMaxQuotaResponseUsesGeneralRemainingWindows(t *testing.T) {
 	}
 }
 
+func TestClientRoutesMiniMaxRegions(t *testing.T) {
+	tests := []struct {
+		name     string
+		endpoint string
+		wantHost string
+		wantPath string
+	}{
+		{"legacy China", "", "api.minimaxi.com", "/v1/token_plan/remains"},
+		{"international", miniMaxGlobalEndpoint, "api.minimax.io", "/v1/api/openplatform/coding_plan/remains"},
+		{"China explicit", miniMaxCNEndpoint, "api.minimaxi.com", "/v1/token_plan/remains"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var seenHost, seenPath, seenAuth string
+			client := NewClient(QuotaHTTPClientFunc(func(_ context.Context, req *http.Request) (*http.Response, error) {
+				seenHost, seenPath, seenAuth = req.URL.Host, req.URL.Path, req.Header.Get("Authorization")
+				return jsonResponse(http.StatusOK, `{"model_remains":[{"model_name":"general","current_interval_remaining_percent":80}],"base_resp":{"status_code":0}}`), nil
+			}))
+			_, err := client.FetchQuota(context.Background(), PlanConfig{Provider: ProviderMiniMax, APIKey: "secret-mm", Endpoint: tt.endpoint})
+			if err != nil {
+				t.Fatalf("FetchQuota() error = %v", err)
+			}
+			if seenHost != tt.wantHost || seenPath != tt.wantPath || seenAuth != "Bearer secret-mm" {
+				t.Fatalf("request = %s %s %q", seenHost, seenPath, seenAuth)
+			}
+		})
+	}
+}
+
+func TestParseMiniMaxInternationalRemainingCountAndOffset(t *testing.T) {
+	now := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
+	result, err := parseMiniMaxQuotaResponse([]byte(`{
+		"model_remains":[{"model_name":"general","current_interval_total_count":100,"current_interval_usage_count":80,"current_weekly_total_count":200,"current_weekly_usage_count":150,"remains_time":3600000,"weekly_remains_time":7200000}],
+		"base_resp":{"status_code":0}
+	}`), miniMaxRegionInternational, now)
+	if err != nil {
+		t.Fatalf("parseMiniMaxQuotaResponse() error = %v", err)
+	}
+	if result.FiveHour.RemainingPercent != 80 || result.FiveHour.UsedPercent != 20 || !result.FiveHour.ResetAt.Equal(now.Add(time.Hour)) {
+		t.Fatalf("five-hour = %#v", result.FiveHour)
+	}
+	if result.Weekly.RemainingPercent != 75 || result.Weekly.UsedPercent != 25 || !result.Weekly.ResetAt.Equal(now.Add(2*time.Hour)) {
+		t.Fatalf("weekly = %#v", result.Weekly)
+	}
+}
+
+func TestParseMiniMaxInternationalPercentageFallback(t *testing.T) {
+	result, err := parseMiniMaxQuotaResponse([]byte(`{
+		"model_remains":[{"model_name":"general","current_interval_remaining_percent":125,"current_weekly_remaining_percent":-5,"current_weekly_status":1}],
+		"base_resp":{"status_code":0}
+	}`), miniMaxRegionInternational, time.Unix(100, 0).UTC())
+	if err != nil {
+		t.Fatalf("parseMiniMaxQuotaResponse() error = %v", err)
+	}
+	if result.FiveHour.RemainingPercent != 100 || result.FiveHour.UsedPercent != 0 || result.Weekly.RemainingPercent != 0 || result.Weekly.UsedPercent != 100 {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestParseMiniMaxChinaUsedCountAndMissingWeekly(t *testing.T) {
+	result, err := parseMiniMaxQuotaResponse([]byte(`{
+		"model_remains":[{"model_name":"MiniMax-M2.7","current_interval_total_count":100,"current_interval_usage_count":80,"remains_time":3600000}],
+		"base_resp":{"status_code":0}
+	}`), miniMaxRegionChina, time.Unix(100, 0).UTC())
+	if err != nil {
+		t.Fatalf("parseMiniMaxQuotaResponse() error = %v", err)
+	}
+	if len(result.Windows) != 1 || result.FiveHour.RemainingPercent != 20 || result.FiveHour.UsedPercent != 80 || result.Weekly.Name != "" {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestParseMiniMaxRejectsNonzeroBaseResponse(t *testing.T) {
+	_, err := parseMiniMaxQuotaResponse([]byte(`{"base_resp":{"status_code":1001,"status_msg":"bad credential"}}`), miniMaxRegionInternational, time.Unix(100, 0).UTC())
+	if err == nil || !strings.Contains(err.Error(), "1001") {
+		t.Fatalf("parseMiniMaxQuotaResponse() error = %v", err)
+	}
+}
+
 func TestParseArkQuotaResponsesExposeAgentAndCodingWindows(t *testing.T) {
 	agent, err := ParseArkAgentQuotaResponse([]byte(`{"Result":{"PlanType":"pro","AFPFiveHour":{"Quota":100,"Used":25,"ResetTime":1780329600},"AFPWeekly":{"Quota":500,"Used":50,"ResetTime":1780848000},"AFPMonthly":{"Quota":1000,"Used":100,"ResetTime":1783008000}}}`))
 	if err != nil {
@@ -205,13 +284,13 @@ func TestClientFetchesMiniMaxWithBearerAndDoesNotLeakKey(t *testing.T) {
 	client := NewClient(QuotaHTTPClientFunc(func(ctx context.Context, req *http.Request) (*http.Response, error) {
 		seenPath = req.URL.Path
 		seenAuth = req.Header.Get("Authorization")
-		return jsonResponse(http.StatusOK, `{"model_remains":[{"model_name":"general","current_interval_remaining_percent":90,"current_weekly_status":3}]}`), nil
+		return jsonResponse(http.StatusOK, `{"model_remains":[{"model_name":"MiniMax-M2.7","current_interval_total_count":100,"current_interval_usage_count":10,"current_weekly_status":3}]}`), nil
 	}))
 	result, err := client.FetchQuota(context.Background(), PlanConfig{ID: "mm", Provider: ProviderMiniMax, APIKey: "secret-mm"})
 	if err != nil {
 		t.Fatalf("FetchQuota() error = %v", err)
 	}
-	if seenPath != "/v1/api/openplatform/coding_plan/remains" || seenAuth != "Bearer secret-mm" {
+	if seenPath != "/v1/token_plan/remains" || seenAuth != "Bearer secret-mm" {
 		t.Fatalf("request path/auth = %q / %q", seenPath, seenAuth)
 	}
 	if result == nil || len(result.Windows) != 1 || result.Windows[0].UsedPercent != 10 {

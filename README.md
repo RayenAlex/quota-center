@@ -37,7 +37,7 @@ Quota Center reuses CPA-native authentication where possible, stores manually ad
 | Provider | Credential source | Notes |
 | --- | --- | --- |
 | Zhipu | API key from config or the management panel | Uses the official quota limit endpoint. |
-| MiniMax Coding Plan | API key from config or the management panel | Supports the official MiniMax Coding Plan endpoints. |
+| MiniMax Coding Plan | API key from config or the management panel | Choose International (`minimax.io`) or China (`minimaxi.com`). International uses `https://api.minimax.io/v1/api/openplatform/coding_plan/remains`; China uses `https://api.minimaxi.com/v1/token_plan/remains`. |
 | Ark | AccessKey ID + Secret AccessKey | Signs Agent / Coding Plan quota requests. |
 | OpenCode Go | API key from config or the management panel | Connections can be saved; no stable public quota endpoint is assumed. |
 | Codex | CPA native authentication | Synced from CPA auth files; do not add a second manual credential here. |
@@ -85,11 +85,19 @@ plugins:
     quota-center:
       timeout: 15s
       accounts:
-        - id: minimax-main
+        - id: minimax-international
           provider: minimax
           plan: coding-plan
-          label: MiniMax Coding
+          label: MiniMax International
           api_key_env: MINIMAX_CODING_KEY
+          endpoint: https://api.minimax.io/v1/api/openplatform/coding_plan/remains
+
+        - id: minimax-china
+          provider: minimax
+          plan: coding-plan
+          label: MiniMax China
+          api_key_env: MINIMAX_CHINA_CODING_KEY
+          endpoint: https://api.minimaxi.com/v1/token_plan/remains
 
         - id: ark-agent
           provider: ark
@@ -99,7 +107,7 @@ plugins:
           secret_key_env: VOLC_SECRET_KEY
 ```
 
-`accounts` is the preferred format. The legacy `plans` array is still accepted and is interpreted as Zhipu accounts for compatibility. Endpoint overrides must use HTTPS and an allow-listed official host; unsupported custom hosts are rejected during configuration.
+`accounts` is the preferred format. The legacy `plans` array is still accepted and is interpreted as Zhipu accounts for compatibility. For MiniMax, omitting `endpoint` preserves the legacy China (`minimaxi.com`) route; set it explicitly to select International or China. Endpoint overrides must use HTTPS and an allow-listed official host; unsupported custom hosts are rejected during configuration.
 
 ## Using the panel
 
