@@ -102,6 +102,7 @@ func TestRPCResourcePathRendersPanel(t *testing.T) {
 	}
 	for _, want := range []string{
 		`data-management-bootstrap="true"`,
+		`</script><script>(()=>{const stores=[];`,
 		`const hasCPAAuth=stores.some(store=>`,
 		`if(hasCPAAuth)document.querySelector('[data-management-view="overview"]')?.click()`,
 	} {

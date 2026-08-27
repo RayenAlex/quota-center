@@ -172,7 +172,7 @@ func renderPanelView(results []PlanResult, generatedAt time.Time, view string, b
 	html := output.String()
 	if bootstrapManagement {
 		const bootstrapScript = `<script>(()=>{const stores=[];try{stores.push(window.localStorage)}catch{}try{stores.push(window.sessionStorage)}catch{}try{if(window.parent&&window.parent!==window){try{stores.push(window.parent.localStorage)}catch{}try{stores.push(window.parent.sessionStorage)}catch{}}}catch{}const hasCPAAuth=stores.some(store=>{try{return String(store?.getItem('cli-proxy-auth')||'').trim()!==''}catch{return false}});if(hasCPAAuth)document.querySelector('[data-management-view="overview"]')?.click()})();</script>`
-		html = strings.Replace(html, `</script></body></html>`, bootstrapScript+`</body></html>`, 1)
+		html = strings.Replace(html, `</script></body></html>`, `</script>`+bootstrapScript+`</body></html>`, 1)
 	}
 	return html
 }
