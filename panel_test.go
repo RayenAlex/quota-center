@@ -91,6 +91,20 @@ func TestRenderPanelRestoresMiniMaxEndpointInEditMode(t *testing.T) {
 	}
 }
 
+func TestRenderPanelUsesAuthenticatedNavigationForViews(t *testing.T) {
+	html := RenderPanel(nil, time.Unix(100, 0).UTC())
+	for _, want := range []string{
+		`data-management-view="overview"`,
+		`data-management-view="accounts"`,
+		`event.preventDefault()`,
+		`loadManagementPanel(link.dataset.managementView||'overview')`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("panel missing authenticated view navigation contract %q", want)
+		}
+	}
+}
+
 func TestRenderPanelAddConnectionOmitsNativeProviders(t *testing.T) {
 	html := RenderPanel(nil, time.Unix(100, 0).UTC())
 	for _, leaked := range []string{
