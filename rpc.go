@@ -16,7 +16,7 @@ import (
 const (
 	pluginID               = "quota-center"
 	pluginName             = "额度中心"
-	pluginVersion          = "0.2.0"
+	pluginVersion          = "0.2.2"
 	managementStatusPath   = "/plugins/" + pluginID + "/status"
 	managementAccountsPath = "/plugins/" + pluginID + "/accounts"
 	// CPA passes the full browser resource path to management.handle.

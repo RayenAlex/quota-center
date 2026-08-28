@@ -34,7 +34,7 @@ func TestRPCRegistrationContract(t *testing.T) {
 	if !envelope.OK || envelope.Result.SchemaVersion != 1 {
 		t.Fatalf("envelope = %#v", envelope)
 	}
-	if envelope.Result.Metadata.Name != "额度中心" || envelope.Result.Metadata.Version != "0.2.0" {
+	if envelope.Result.Metadata.Name != "额度中心" || envelope.Result.Metadata.Version != "0.2.2" {
 		t.Fatalf("metadata = %#v", envelope.Result.Metadata)
 	}
 	if !envelope.Result.Capabilities.ManagementAPI {
