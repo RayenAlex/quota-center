@@ -81,6 +81,18 @@ jobs:
           path: release-artifacts
           merge-multiple: true
 
+      - name: Assemble aggregate checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          archive_files=(release-artifacts/*.zip)
+          checksum_files=(release-artifacts/*.zip.sha256)
+          test "${#archive_files[@]}" -gt 0
+          test "${#archive_files[@]}" -eq "${#checksum_files[@]}"
+          cat "${checksum_files[@]}" | LC_ALL=C sort > release-artifacts/checksums.txt
+          test -s release-artifacts/checksums.txt
+
       - name: Refuse an existing release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
